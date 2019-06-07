@@ -1,0 +1,233 @@
+#==============================================================================
+# Joseph D. Olson
+# 06/04/19
+# VU-GIST RESEARCH
+#------------------------------------------------------------------------------
+# Notes: This script will work on applying machine learning to VU-GIST EGG
+# data to classify healthy vs. unhealthy based off Regional PPD values
+#
+#
+# Here, KNN method is used
+#
+#
+#------------------------------------------------------------------------------
+#==============================================================================
+#%%
+
+# imports
+import pdb
+import sys
+import os
+import inspect
+import numpy as np
+import matplotlib.pyplot as plt
+import scipy
+import scipy.io as scio
+
+# Specific Imports:
+from scipy import integrate
+from mpldatacursor import datacursor
+
+# Personal Imports:
+
+# add relative path
+scriptDir = os.path.dirname(os.path.abspath(inspect.getfile(
+                                                       inspect.currentframe())))
+parentDir = os.path.dirname(scriptDir)
+sys.path.insert(0,scriptDir)
+
+#------------------------------------------------------------------------------
+# MAIN CODE
+
+def main():
+    pass
+
+
+
+
+
+def some_func():
+    pass
+
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+
+
+if __name__ == '__main__':
+    main()
+
+#-----------------------------------------------------------------------------
+# TODO:
+#
+#
+#-----------------------------------------------------------------------------
+# Open Workspace
+
+# first lets gather all required data sets
+
+# gather all control data sets
+
+control3 = scio.loadmat(scriptDir +'/batch2/control3/control3_features.mat')
+control3_PPD_mean = control3['PPD_mean'];
+new_order = np.array([2,1,4,3,5,7,6,9,8,10,12,11,14,13,15]) - 1;
+control3_PPD_mean = control3_PPD_mean[0:10,new_order]
+
+control3_PPD_std = control3['PPD_std'];
+control3_PPD_std = control3_PPD_std[0:10,new_order];
+
+control7 = scio.loadmat(scriptDir +'/batch2/control7/control7_features.mat')
+control7_PPD_mean = control7['PPD_mean'];
+control7_PPD_std = control7['PPD_std'];
+
+control8 = scio.loadmat(scriptDir +'/batch2/control8/control8_features.mat')
+control8_PPD_mean = control8['PPD_mean'];
+control8_PPD_std = control8['PPD_std'];
+
+
+control9 = scio.loadmat(scriptDir +'/batch2/control9/control9_features.mat')
+control9_PPD_mean = control9['PPD_mean'];
+control9_PPD_std = control9['PPD_std'];
+
+
+control10 = scio.loadmat(scriptDir +'/batch2/control10/control10_features.mat')
+control10_PPD_mean = control10['PPD_mean'];
+control10_PPD_std = control10['PPD_std'];
+
+
+control11 = scio.loadmat(scriptDir +'/batch2/control11/control11_features.mat')
+control11_PPD_mean = control11['PPD_mean'];
+control11_PPD_std = control11['PPD_std'];
+
+
+control12 = scio.loadmat(scriptDir +'/batch2/control12/control12_features.mat')
+control12_PPD_mean = control12['PPD_mean'];
+control12_PPD_std = control12['PPD_std'];
+
+
+control13 = scio.loadmat(scriptDir +'/batch2/control13/control13_features.mat')
+control13_PPD_mean = control13['PPD_mean'];
+control13_PPD_std = control13['PPD_std'];
+
+
+control17 = scio.loadmat(scriptDir +'/batch2/control17/control17_features.mat')
+control17_PPD_mean = control17['PPD_mean'];
+control17_PPD_std = control17['PPD_std'];
+
+
+# now gather all the patient data
+
+patient10 = scio.loadmat(scriptDir +'/batch2/patient10/patient10_features.mat')
+patient10_PPD_mean = patient10['PPD_mean'];
+patient10_PPD_std = patient10['PPD_std'];
+
+
+patient13 = scio.loadmat(scriptDir +'/batch2/patient13/patient13_features.mat')
+patient13_PPD_mean = patient13['PPD_mean'];
+patient13_PPD_std = patient13['PPD_std'];
+
+patient18 = scio.loadmat(scriptDir +'/batch2/patient18/patient18_features.mat')
+patient18_PPD_mean = patient18['PPD_mean'];
+patient18_PPD_std = patient18['PPD_std'];
+
+patient21 = scio.loadmat(scriptDir +'/batch2/patient21/patient21_features.mat')
+patient21_PPD_mean = patient21['PPD_mean'];
+patient21_PPD_std = patient21['PPD_std'];
+
+patient22 = scio.loadmat(scriptDir +'/batch2/patient22/patient22_features.mat')
+patient22_PPD_mean = patient22['PPD_mean'];
+patient22_PPD_std = patient22['PPD_std'];
+
+patient23 = scio.loadmat(scriptDir +'/batch2/patient23/patient23_features.mat')
+patient23_PPD_mean = patient23['PPD_mean'];
+patient23_PPD_std = patient23['PPD_std'];
+
+patient24 = scio.loadmat(scriptDir +'/batch2/patient24/patient24_features.mat')
+patient24_PPD_mean = patient24['PPD_mean'];
+patient24_PPD_std = patient24['PPD_std'];
+
+patient26 = scio.loadmat(scriptDir +'/batch2/patient26/patient26_features.mat')
+patient26_PPD_mean = patient26['PPD_mean'];
+patient26_PPD_std = patient26['PPD_std'];
+
+
+
+# alright time to start building a logistic regression model to start
+
+
+
+# create labels
+
+# labels_1 will be for ppd means only
+labels_1 = ['pb_R1_mean','pb_R2_mean','pb_R3_mean','pb_R4_mean','pb_R5_mean',
+            'pn_R1_mean','pn_R2_mean','pn_R3_mean','pn_R4_mean','pn_R5_mean',
+            'pt_R1_mean','pb_R2_mean','pb_R3_mean','pb_R4_mean','pb_R5_mean'];
+
+# labels_2 will be for when the std values are also included
+labels_2 = ['pb_R1_mean','pb_R2_mean','pb_R3_mean','pb_R4_mean','pb_R5_mean',
+            'pn_R1_mean','pn_R2_mean','pn_R3_mean','pn_R4_mean','pn_R5_mean',
+            'pt_R1_mean','pb_R2_mean','pb_R3_mean','pb_R4_mean','pb_R5_mean',
+            'pb_R1_std','pb_R2_std','pb_R3_std','pb_R4_std','pb_R5_std',
+            'pn_R1_std','pn_R2_std','pn_R3_std','pn_R4_std','pn_R5_std',
+            'pt_R1_std','pb_R2_std','pb_R3_std','pb_R4_std','pb_R5_std'];
+
+# eventually pre and post prandial differences will be added,
+# as well as R value and dominant frequencies
+
+# total samples = 171 = 90 controls + 81 patients
+
+
+# now lets create a target vector
+# convention: normal = 0, unhealthy = 1
+y = np.concatenate((np.zeros(90), np.ones(81)));
+
+y = y.astype(int); # convert data type to integer
+
+# now vertically stack all of the control and patient data
+
+X = np.vstack([control3_PPD_mean, control7_PPD_mean, control8_PPD_mean,
+               control9_PPD_mean, control10_PPD_mean, control11_PPD_mean,
+               control12_PPD_mean, control13_PPD_mean, control17_PPD_mean,
+               patient10_PPD_mean, patient13_PPD_mean, patient18_PPD_mean,
+               patient21_PPD_mean, patient22_PPD_mean,patient23_PPD_mean,
+               patient24_PPD_mean, patient26_PPD_mean]);
+
+
+# now lets shuffle and split the data appropriately
+
+
+from sklearn.model_selection import train_test_split
+[X_train, X_test, y_train, y_test] = train_test_split(X, y, test_size=0.3,
+                                                      random_state=1,
+                                                      stratify=y);
+
+# apply standardization of data
+from sklearn.preprocessing import StandardScaler
+sc = StandardScaler();
+sc.fit(X_train);
+X_train_std = sc.transform(X_train)
+X_test_std = sc.transform(X_test)
+
+# now build logistic regression model
+from sklearn.neighbors import KNeighborsClassifier
+knn = KNeighborsClassifier(n_neighbors=8, p=2, metric='minkowski');
+
+knn.fit(X_train_std, y_train);
+
+
+# return mean accuracy of classification for training and test set
+print('training set accuracy:', knn.score(X_train_std, y_train))
+print('test set accuracy:', knn.score(X_test_std, y_test))
+
+
+
+
+
+
+
+
+
+
+
+#-----------------------------------------------------------------------------
+# Scratch
