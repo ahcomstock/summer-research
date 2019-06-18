@@ -1,0 +1,85 @@
+%% Andrew Comstock VUGIST 06/17/19
+
+%Written in Matlab
+%The purpose of this code is to replace or supplemet the velocity
+%calculation in calcPropVelClean1, and fully automate all processes and 
+%quantify the change in angle from one velocity to another to create a way 
+%to determine the direction of propagation.
+
+%% Finding the average velocity over the path
+
+%xd must already be loaded in the workspace from running calcPropVelClean1
+
+cutoff = .1;
+n = 0;
+maxdata = xd;
+timestep = 1/3;
+[length,~]= size(maxdata);
+
+%find the change in x and y between every two points in time
+inf_small_velx = diff(maxdata(:,1))/timestep;
+inf_small_vely = diff(maxdata(:,2))/timestep;
+    
+inf_small_vel = sqrt(inf_small_velx.^2 + inf_small_vely.^2);
+
+%throw out the data that represents a 'jump' in the maximum.
+for i = 1:(length-1)
+    
+    if abs(maxdata(i,1)-maxdata(i+1,1))> cutoff*timestep
+        inf_small_vel(i) = NaN;
+        n = n+1;
+    elseif abs(maxdata(i,2)-maxdata(i+1,2))> cutoff*timestep
+        inf_small_vel(i) = NaN;
+        n=n+1;
+    end
+  
+end
+        
+v = mean(inf_small_vel,'omitnan');
+
+fprintf('the average speed was %0.6f and the number of jumps was %f\n',v,n)
+
+%% direction calculation
+% now we need to find the change in angles, hopefully to determine if the 
+%propagation is retrograde or anterograde
+
+angles = atand(inf_small_vely./inf_small_velx);
+
+%condition the data:
+for i = 1:(length-1)
+    
+    %throw out angle measures that correspond to 'jumps' if the slow wave
+    %'restarts' we don't want to measure that
+    if abs(maxdata(i,1)-maxdata(i+1,1))> cutoff*timestep
+        angles(i) = NaN;
+        n = n+1;
+    elseif abs(maxdata(i,2)-maxdata(i+1,2))> cutoff*timestep
+        angles(i) = NaN;
+        n=n+1;
+    end
+    
+    %this section fixes the domain issues with the atand function. After
+    %this, angles are defined on 0 to 360
+    if inf_small_velx(i) <= 0 && inf_small_vely(i) <= 0
+        angles(i) = angles(i) + 180;
+    elseif inf_small_velx(i) <= 0 && inf_small_vely(i) >= 0
+        angles(i) = angles(i) + 180;
+    elseif inf_small_velx(i) >= 0 && inf_small_vely(i) <= 0
+        angles(i) = angles(i) + 360;
+    end
+  
+end
+
+%throw away the angles that correspond to no movement
+good_locations = find(angles);
+[siz,~] = size(good_locations);
+angles1 = zeros(size(good_locations));
+for i = 1:siz
+    angles1(i) = angles(good_locations(i));
+end
+
+%angles1 contains all the good angles that correspond to normal movement of
+%the gastric slow wave.
+average_angles = mean(angles1,'omitnan');
+fprintf('the average angle is %f degrees from +x\n',average_angles)
+
