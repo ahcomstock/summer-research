@@ -1,42 +1,86 @@
-%% Andrew Comstock VUGIST 06/17/19
-
+%% Andrew Comstock VUGIST 06/20/19
+%Written in Matlab
 %The purpose of this code is to supplemet the velocity
 %calculation in calcPropVelClean1, fully automate all processes, and 
 %quantify the change in angle from one velocity element to another 
 %to create a way to determine the direction of propagation.
 
+
+%% Code taken from CalcPropVelClean1
+
+% transpose reconstructed BDF sobi signals
+xrecBDF_t=xrecBDF';
+
+% each column in xrecBDF is an xrec channel 
+
+% standard 5x5 electrode configuration ( in meters) 
+% later down the road we want to 
+x=[-.1 -.05 0 .05 .1 -.1 -.05  0 .05 .1 -.1 -.05 0 .05 .1 -.1 -.05 0 .05 .1 ...
+   -.1 -.05 0 .05 .1];                        
+y=[.1 .1 .1 .1 .1 .05 .05 .05 .05 .05 0 0 0 0 0 -.05 -.05 -.05 -.05 -.05 -.1 ...
+   -.1 -.1 -.1 -.1]; 
+
+%using p just to save some space in the next line
+[Xg,Yg] = meshgrid(linspace(-0.1,0.1),linspace(-0.1,0.1));
+
+% [create gastric slow wave propagation animation]
+% map data to grid points since mesh Xg Yg has been created
+
+[r,~] = size(xrecBDF_t);
+iters = floor(r/10); 
+
+clear zg
+for i= 1:iters
+    zg(:,:,i)=griddata(x,y,xrecBDF_t(i*10,:),Xg,Yg,'cubic');  
+end
+
+
+ for j=1:360
+     % find maximum of xrec signals and return indicies
+     [xj(j),yj(j)]=maxmat(zg(:,:,j));
+         
+     % using grid points return location of channel tht corresponds to max
+     xd(j,:)=[Xg(xj(j),yj(j)) Yg(xj(j),yj(j))];
+    
+ end
 %% Finding the average velocity over the path
 
 %xd must already be loaded in the workspace from running calcPropVelClean1
 
-cutoff = .3;
+cutoff = .15;
 n = 0;
 maxdata = xd;
 timestep = 1/3;
-[length,~]= size(maxdata);
+[len,~]= size(maxdata);
 
 %find the change in x and y between every two points in time
 inf_small_velx = diff(maxdata(:,1))/timestep;
 inf_small_vely = diff(maxdata(:,2))/timestep;
 
-%throw out the data that represents a 'jump' in the maximum.
-for i = 1:(length-1)
+%throw out the data that represents a 'jump' in the maximum, and figure out
+%the locations at which that occurs
+
+for i = 1:(len-1)
     
     if abs(maxdata(i,1)-maxdata(i+1,1))> cutoff*timestep
         inf_small_velx(i) = NaN;
         n = n+1;
-    elseif abs(maxdata(i,2)-maxdata(i+1,2))> cutoff*timestep
+        jumps(n) = i;
+    end
+    if abs(maxdata(i,2)-maxdata(i+1,2))> cutoff*timestep
         inf_small_vely(i) = NaN;
         n=n+1;
+        jumps(n) = i;
+        %maybe this section helps the data, maybe not. not sure yet:
+%     elseif abs(maxdata(i,1)-maxdata(i+1,1)) == 0
+%         inf_small_velx(i) = NaN;
+%     elseif abs(maxdata(i,2)-maxdata(i+1,2)) == 0
+%         inf_small_vely(i) = NaN;
     end
   
 end
-    
-inf_small_vel = sqrt(inf_small_velx.^2 + inf_small_vely.^2);
-     
-v = mean(inf_small_vel,'omitnan');
 
-fprintf('the average speed was %0.6f and the number of jumps was %f\n',v,n)
+fprintf('the number of jumps was %f\n',n)
 
 %% direction calculation
 % now we need to find the change in angles, hopefully to determine if the 
@@ -45,17 +89,7 @@ fprintf('the average speed was %0.6f and the number of jumps was %f\n',v,n)
 angles = atand(inf_small_vely./inf_small_velx);
 
 %condition the data:
-for i = 1:(length-1)
-    
-    %throw out angle measures that correspond to 'jumps' if the slow wave
-    %'restarts' we don't want to measure that
-    if abs(maxdata(i,1)-maxdata(i+1,1))> cutoff*timestep
-        angles(i) = NaN;
-        n = n+1;
-    elseif abs(maxdata(i,2)-maxdata(i+1,2))> cutoff*timestep
-        angles(i) = NaN;
-        n=n+1;
-    end
+for i = 1:(len-1)
     
     %this section fixes the domain issues with the atand function. After
     %this, angles are defined on 0 to 360
@@ -69,34 +103,57 @@ for i = 1:(length-1)
   
 end
 
-%throw away the angles that correspond to no movement
-good_locations = find(angles);
-[siz,~] = size(good_locations);
-angles1 = zeros(size(good_locations));
-for i = 1:siz
-    angles1(i) = angles(good_locations(i));
+inf_small_vel = sqrt(inf_small_velx.^2 + inf_small_vely.^2);
+
+figure
+polarscatter((angles).*pi./180,inf_small_vel)
+title('velocity distribution over angles')
+
+%% Analyzing the direction/velocity data
+
+
+%first we might want to find the average position of each point on the
+%polarscatter plot. we can read the average position (velocity) and compare
+%that to the average speed
+
+%average over the velx and vely seperately, find the resulting magnitude
+%and angle
+
+avg_velx = mean(inf_small_velx,'omitnan');
+avg_vely = mean(inf_small_vely,'omitnan');
+
+avg_vel = sqrt(avg_velx^2 + avg_vely^2);
+velocity_angle = atand(avg_vely/avg_velx);
+
+%this section fixes the domain issues with the atand function. After
+%this, angles are defined on 0 to 360
+if avg_velx <= 0 && avg_vely <= 0
+    velocity_angle = velocity_angle + 180;
+elseif avg_velx <= 0 && avg_vely >= 0
+    velocity_angle = velocity_angle + 180;
+elseif avg_velx >= 0 && avg_vely < 0
+    velocity_angle = velocity_angle + 360;
 end
 
-%angles1 contains all the good angles that correspond to normal movement of
-%the gastric slow wave.
 
-average_angles = mean(angles1,'omitnan');
-fprintf('the average angle is %f degrees from +x\n',average_angles)
 
-%maybe implement a weighted mean. Let the angles that correspond to longer
-%paths be weighted higher
+hold on
+polarscatter(velocity_angle*pi/180,avg_vel,'red','x')
+hold off
 
-fprintf('now calculating the weighted average...\n')
-figure
-polarscatter(angles.*pi./180,inf_small_vel)
-title('velocity distibution over angles')
+%this segment determines what direction the data moves in (which quadrant)
+% if abs(average_angles-weighted_average) > 60
+%     fprintf('not a good timestamp; manually check the propagation map\n')
+% else
+    if velocity_angle < 90
+        fprintf('propagation is in the 1st quadrant, retrograde\n\n')
+    elseif velocity_angle < 180
+        fprintf('propagation is in the 2nd quadrant, retrograde\n\n')
+    elseif velocity_angle < 270
+        fprintf('propagation is in the 3rd quadrant, anterograde\n\n')
+    else
+        fprintf('propagation is in the 4th quadrant, anterograde\n\n')
+    end
+%end
 
-weighted_average = sum(inf_small_vel.*angles,'omitnan');
-weighted_average = weighted_average/sum(inf_small_vel,'omitnan');
-
-fprintf('the weighted average is %f\n',weighted_average)
-
-%for the data set taken on new years eve, 2018, time stamp 540, the
-%weighted average gave a better approximation to the observed propagation
-%direction. Test other data sets to see what works. Also, we need to
-%determine the right number for the cutoff value.
+fprintf('the average velocity is %f at %f\n',avg_vel,velocity_angle)
