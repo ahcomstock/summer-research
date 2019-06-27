@@ -1,0 +1,196 @@
+%% ------------------------------------------------------------------------
+% Andrew Comstock VUGIST 06/25/19
+
+%this script creates pseudodata with known velocity values and angle to
+%compare different velocity calculation methods.
+%velocity = 14.14 mm/s
+%frequency = 3 cpm
+%%-------------------------------------------------------------------------
+
+clear variables
+
+%create a 20 by 20 array and then downsize it to 5 by 5. This will make the
+%propagation look smoother.
+
+xrecBDF_ = zeros(400,3600);
+A = 100; %amplitude
+stdev = [25,15]; %relative width of maximum
+
+%now, create a vector that corresponds to the time spent at each location
+%in the 40x40 array. 
+times_of_motion = ones(1,20);
+time = [28,28,32,32];
+
+for i = 0:5:20
+    if i~=0
+        times_of_motion(i-4:i) = time(i/5)*times_of_motion(i-4:i);
+    end
+end
+
+times_of_motion = times_of_motion(randperm(length(times_of_motion)));
+%now the time spent at each location is a random permutation of the numbers
+%contained in 'time'. Remember, these are scaled by a factor of three, so
+%any element in 'time' corresponds to a third of that number in seconds.
+
+for i = 2:20
+    times_of_motion(i) = times_of_motion(i)+times_of_motion(i-1);
+end
+%now the vector gives the explicit time with which to switch, not just
+%relative
+
+%this next part creates a vector that contains the location of each
+%maximum. I have made it so that it starts at (1,20) and ends at (20,1).
+
+locations_of_maximum = ones(20,2);
+
+for i = 1:20
+    if i == 1
+        locations_of_maximum(i,2) = 20;
+    else
+        locations_of_maximum(i,2) = locations_of_maximum(i-1,2) - 1;
+        locations_of_maximum(i,1) = locations_of_maximum(i-1,1) + 1;
+    end
+end
+
+%now, place the maxima
+
+arrayt = zeros(20,20);
+
+for i = 1:20
+    arrayt(i,:) = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20];
+end
+
+array = arrayt';
+
+X = [arrayt(:),array(:)];
+% X is an array that contains every ordered pair in the 20x20 array
+
+next = 0;
+
+for m = 1:6
+    for i = 1:19
+    
+        for t = (times_of_motion(i)+next):(times_of_motion(i+1)+next)
+            mu = locations_of_maximum(i,:);
+            y = mvnpdf(X,mu,stdev);
+            xrecBDF_(:,t) = y;
+        end
+        
+    end
+    next = next + 590;
+end
+%we just filled up xrecBDF_ in 400 column intervals until we got to 3600.
+%amplitude modification:
+xrecBDF_ = A.*xrecBDF_(:,1:3600);
+
+%% Now downsize the array
+xrecBDF = zeros(25,3600);
+
+new = (1:25);
+old = [0:5:20,80:5:100,180:5:200,280:5:300,380:5:400];
+
+for i = 1:5:21
+    old(i) = old(i) + 1;
+end
+
+for i = 1:25
+    xrecBDF(new(i),:) = xrecBDF_(old(i),:);
+end
+
+
+amt_of_rand = 0.01;
+maxBDF = max(max(abs(xrecBDF)));
+real = amt_of_rand*maxBDF*rand(25,360);
+add = zeros(25,3600);
+
+for i = 0:20:3580
+    for j = 1:20
+        add(:,i+j) = real(:,i/10 +1);
+    end
+end
+
+xrecBDF = xrecBDF + add;
+
+for i = 1:25
+    for j = 3:3598
+        xrecBDF(i,j) = (xrecBDF(i,j+2)+xrecBDF(i,j-2))/4;
+    end
+end
+
+xrecBDFhelp = zeros(25,361);
+for i = 1:360
+    xrecBDFhelp(:,i) = xrecBDF(:,i*10);
+end
+
+sampoints = [1,10:10:3590,3600];
+xq = (1:3600);
+
+
+for i = 1:25
+    xrecBDF(i,:) = interp1(sampoints,xrecBDFhelp(i,:),xq,'cubic');
+end
+
+%how to smooth out the data?
+
+
+%% Visualize the data
+
+% transpose reconstructed BDF sobi signals
+xrecBDF_t=xrecBDF';
+
+% each column in xrecBDF is an xrec channel 
+
+% standard 5x5 electrode configuration ( in meters) 
+x=[-.1 -.05 0 .05 .1 -.1 -.05  0 .05 .1 -.1 -.05 0 .05 .1 -.1 -.05 0 .05 .1 ...
+   -.1 -.05 0 .05 .1];                        
+y=[.1 .1 .1 .1 .1 .05 .05 .05 .05 .05 0 0 0 0 0 -.05 -.05 -.05 -.05 -.05 -.1 ...
+   -.1 -.1 -.1 -.1]; 
+
+% create mesh grid
+[Xg,Yg] = meshgrid(linspace(-0.1,0.1),linspace(-0.1,0.1));
+
+
+% [create gastric slow wave propagation animation]
+% map data to grid points since mesh Xg Yg has been created
+
+[r,~] = size(xrecBDF_t);
+iters = r/10; 
+
+zg = zeros(length(Xg),length(Yg),360);
+
+for i= 1:iters
+    zg(:,:,i)=griddata(x,y,xrecBDF_t(i*10,:),Xg,Yg,'cubic');  % decimate by 10
+end
+
+% produce animation of gastric slow wave propagation
+figure();   
+%pcolor(zg(:,:,1))
+
+% compute maximas 
+ for j=1:360
+     
+     % find maximum of xrec signals and return indicies 
+     [xj(j),yj(j)]=maxmat(zg(:,:,j));
+         
+     % using grid points return location of channel which corresponds to max loc 
+     xd(j,:)=[Xg(xj(j),yj(j)) Yg(xj(j),yj(j))];
+     
+     
+ end
+
+for i=1:floor((r/10)) % take into account decimation
+   
+    
+    pcolor(zg(:,:,i));
+    %colorbar
+    %caxis([-2 2])
+    shading interp;
+    hold on 
+    plot(yj(i),xj(i),'r*','MarkerSize',14)
+    
+    pause(0.05);
+    
+    hold off
+    
+    colormap(parula) % hot or jet works pretty nice, default is parula 
+end
